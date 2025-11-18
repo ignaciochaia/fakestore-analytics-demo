@@ -1,7 +1,7 @@
 import os
 import sys
 from datetime import datetime
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -88,7 +88,7 @@ def upsert_products(conn) -> None:
     print("Products upserted.")
 
 
-def _safe_float(value: Any) -> float | None:
+def _safe_float(value: Any) -> Optional[float]:
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -168,7 +168,7 @@ def upsert_customers(conn) -> None:
     print("Customers upserted.")
 
 
-def _parse_cart_date(value: str | None) -> datetime | None:
+def _parse_cart_date(value: Optional[str]) -> Optional[datetime]:
     if not value:
         return None
     try:
