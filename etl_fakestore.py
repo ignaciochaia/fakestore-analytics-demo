@@ -9,6 +9,10 @@ from psycopg2.extras import execute_values
 import requests
 
 BASE_URL = "https://fakestoreapi.com"
+DEFAULT_HEADERS = {
+    "User-Agent": "FakeStore-ETL/1.0 (+github.com/ignaciochaia/fakestore-analytics-demo)",
+    "Accept": "application/json",
+}
 
 
 def get_conn():
@@ -25,7 +29,7 @@ def fetch_json(path: str) -> Any:
     last_err: Optional[Exception] = None
     for attempt in range(1, 6):
         try:
-            resp = requests.get(url, timeout=30)
+            resp = requests.get(url, timeout=30, headers=DEFAULT_HEADERS)
             resp.raise_for_status()
             data = resp.json()
             if not isinstance(data, (list, dict)):
