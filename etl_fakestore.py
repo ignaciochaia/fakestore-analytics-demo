@@ -26,7 +26,7 @@ def get_conn():
 
 def _decode_response(resp: requests.Response) -> Any:
     try:
-        return resp.json()
+        data = resp.json()
     except ValueError:
         text = resp.text.strip()
         marker = "Markdown Content:\n"
@@ -38,8 +38,21 @@ def _decode_response(resp: requests.Response) -> Any:
         )
         if start != -1:
             payload = text[start:]
-            return json.loads(payload)
-        raise
+            data = json.loads(payload)
+        else:
+            raise
+
+    if (
+        isinstance(data, dict)
+        and isinstance(data.get("data"), dict)
+        and isinstance(data["data"].get("content"), str)
+    ):
+        try:
+            return json.loads(data["data"]["content"])
+        except json.JSONDecodeError:
+            pass
+
+    return data
 
 
 def fetch_json(path: str) -> Any:
