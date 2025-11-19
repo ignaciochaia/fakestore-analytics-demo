@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -21,12 +22,24 @@ def get_conn():
 def fetch_json(path: str) -> Any:
     """Fetch JSON from the FakeStore API."""
     url = f"{BASE_URL}/{path.lstrip('/')}"
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    if not isinstance(data, (list, dict)):
-        raise ValueError(f"Unexpected response shape for {url}")
-    return data
+    last_err: Optional[Exception] = None
+    for attempt in range(1, 6):
+        try:
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            if not isinstance(data, (list, dict)):
+                raise ValueError(f"Unexpected response shape for {url}")
+            return data
+        except Exception as err:
+            last_err = err
+            wait = min(2 ** attempt, 30)
+            print(
+                f"Request to {url} failed on attempt {attempt}: {err}. "
+                f"Retrying in {wait}s..."
+            )
+            time.sleep(wait)
+    raise RuntimeError(f"Failed to fetch {url} after retries: {last_err}")
 
 
 def upsert_products(conn) -> None:
