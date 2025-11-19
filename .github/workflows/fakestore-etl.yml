@@ -24,3 +24,4 @@ jobs:
         run: python etl_fakestore.py
         env:
           PG_CONN_STR: ${{ secrets.PG_CONN_STR }}
+          FAKESTORE_BASE_URL: https://r.jina.ai/https://fakestoreapi.com

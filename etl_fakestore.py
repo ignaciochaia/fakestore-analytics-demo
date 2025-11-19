@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -8,7 +9,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 import requests
 
-BASE_URL = "https://fakestoreapi.com"
+BASE_URL = os.getenv("FAKESTORE_BASE_URL", "https://fakestoreapi.com").rstrip("/")
 DEFAULT_HEADERS = {
     "User-Agent": "FakeStore-ETL/1.0 (+github.com/ignaciochaia/fakestore-analytics-demo)",
     "Accept": "application/json",
@@ -23,6 +24,24 @@ def get_conn():
     return psycopg2.connect(conn_str, sslmode="require")
 
 
+def _decode_response(resp: requests.Response) -> Any:
+    try:
+        return resp.json()
+    except ValueError:
+        text = resp.text.strip()
+        marker = "Markdown Content:\n"
+        if marker in text:
+            text = text.split(marker, 1)[1].strip()
+        start = min(
+            [idx for idx in (text.find("["), text.find("{")) if idx != -1],
+            default=-1,
+        )
+        if start != -1:
+            payload = text[start:]
+            return json.loads(payload)
+        raise
+
+
 def fetch_json(path: str) -> Any:
     """Fetch JSON from the FakeStore API."""
     url = f"{BASE_URL}/{path.lstrip('/')}"
@@ -31,7 +50,7 @@ def fetch_json(path: str) -> Any:
         try:
             resp = requests.get(url, timeout=30, headers=DEFAULT_HEADERS)
             resp.raise_for_status()
-            data = resp.json()
+            data = _decode_response(resp)
             if not isinstance(data, (list, dict)):
                 raise ValueError(f"Unexpected response shape for {url}")
             return data
