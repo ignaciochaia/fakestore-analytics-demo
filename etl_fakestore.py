@@ -178,6 +178,26 @@ def _parse_cart_date(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
+def _resolve_cart_customer_column(conn) -> str:
+    """Return the column name used for customer reference in carts."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'carts'
+              AND column_name IN ('customer_id', 'user_id')
+            LIMIT 1
+            """
+        )
+        row = cur.fetchone()
+    if not row:
+        raise RuntimeError(
+            "carts table must include either customer_id or user_id column"
+        )
+    return row[0]
+
+
 def upsert_carts_and_items(conn) -> None:
     print("Fetching carts...")
     carts: List[Dict[str, Any]] = fetch_json("carts")
@@ -202,19 +222,22 @@ def upsert_carts_and_items(conn) -> None:
                 )
             )
 
+    customer_col = _resolve_cart_customer_column(conn)
+
     with conn.cursor() as cur:
         if cart_rows:
             print(f"Upserting {len(cart_rows)} carts...")
-            sql = """
+            sql = f"""
                 INSERT INTO carts (
                     id,
-                    customer_id,
+                    {customer_col},
                     cart_date,
+                    inserted_at,
                     updated_at
                 )
                 VALUES %s
                 ON CONFLICT (id) DO UPDATE SET
-                    customer_id = EXCLUDED.customer_id,
+                    {customer_col} = EXCLUDED.{customer_col},
                     cart_date = EXCLUDED.cart_date,
                     updated_at = now()
             """
@@ -222,7 +245,7 @@ def upsert_carts_and_items(conn) -> None:
                 cur,
                 sql,
                 cart_rows,
-                template="(%s,%s,%s,now())",
+                template="(%s,%s,%s,now(),now())",
             )
         else:
             print("No carts fetched; skipping cart upsert.")
@@ -235,6 +258,7 @@ def upsert_carts_and_items(conn) -> None:
                     cart_id,
                     product_id,
                     quantity,
+                    inserted_at,
                     updated_at
                 )
                 VALUES %s
@@ -243,7 +267,7 @@ def upsert_carts_and_items(conn) -> None:
                 cur,
                 sql_items,
                 item_rows,
-                template="(%s,%s,%s,now())",
+                template="(%s,%s,%s,now(),now())",
             )
             print(f"Inserted {len(item_rows)} cart items.")
         else:
